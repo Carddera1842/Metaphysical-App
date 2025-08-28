@@ -16,37 +16,38 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
 
-        private final UserRepository userRepository;
-        private final JwtUtil jwtUtil;
-        private final BCryptPasswordEncoder passwordEncoder; // <-- inject bean
+    private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
+    private final BCryptPasswordEncoder passwordEncoder; // <-- inject bean
 
-        @PostMapping("/register")
-        public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
-            if (userRepository.existsByEmail(request.getEmail())) {
-                return ResponseEntity.badRequest().body("Email already in use");
-            }
-
-            User user = User.builder()
-                    .email(request.getEmail())
-                    .password(passwordEncoder.encode(request.getPassword()))
-                    .displayName(request.getDisplayName())
-                    .build();
-
-            userRepository.save(user);
-            String token = jwtUtil.generateToken(user.getEmail());
-            return ResponseEntity.ok(new AuthResponse(token));
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            return ResponseEntity.badRequest().body("Email already in use");
         }
 
-        @PostMapping("/login")
-        public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-            User user = userRepository.findByEmail(request.getEmail())
-                    .orElse(null);
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .displayName(request.getDisplayName())
+                .build();
 
-            if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-                return ResponseEntity.status(401).body("Invalid credentials");
-            }
+        userRepository.save(user);
+        String token = jwtUtil.generateToken(user.getEmail());
+        return ResponseEntity.ok(new AuthResponse(token));
+    }
 
-            String token = jwtUtil.generateToken(user.getEmail());
-            return ResponseEntity.ok(new AuthResponse(token));
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElse(null);
+
+        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            return ResponseEntity.status(401).body("Invalid credentials");
         }
+
+        String token = jwtUtil.generateToken(user.getEmail());
+        return ResponseEntity.ok(new AuthResponse(token));
+    }
 }
+

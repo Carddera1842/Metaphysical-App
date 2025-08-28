@@ -1,12 +1,15 @@
 package com.metaphysical.metaphysical.controller;
 
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import com.metaphysical.metaphysical.dto.HoroscopeRequest;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -14,28 +17,37 @@ import java.util.Map;
 public class HoroscopeController {
 
     private final RestTemplate restTemplate;
+    private final String apiKey = "dcK6WOXwUM4jxCEkdtZo175ImDtBjmQI631caiCH";
 
     public HoroscopeController(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
-    @GetMapping("/daily/{sign}")
-    public ResponseEntity<?> getDailyHoroscope(@PathVariable String sign) {
-        // aztro API URL
-        String url = "https://aztro.sameerkumar.website/";
+    @PostMapping("/planets")
+    public ResponseEntity<?> getPlanetaryPositions(@RequestBody HoroscopeRequest request) {
+        try {
+            String apiUrl = "https://json.freeastrologyapi.com/western/planets";
 
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url)
-                .queryParam("sign", sign.toLowerCase())
-                .queryParam("day", "today");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("x-api-key", apiKey);  // ✅ MUST be this
 
-        // POST request to aztro API
-        ResponseEntity<Map> response = restTemplate.exchange(
-                builder.toUriString(),
-                HttpMethod.POST,
-                HttpEntity.EMPTY,
-                Map.class
-        );
+            HttpEntity<HoroscopeRequest> entity = new HttpEntity<>(request, headers);
 
-        return ResponseEntity.ok(response.getBody());
+            ResponseEntity<String> response = restTemplate.exchange(
+                    apiUrl, HttpMethod.POST, entity, String.class);
+
+            return ResponseEntity.ok(response.getBody());
+        } catch (HttpClientErrorException.Forbidden e) {
+            Map<String, String> fallback = new HashMap<>();
+            fallback.put("description", "Planetary data service temporarily unavailable (403).");
+            fallback.put("status", "error");
+            return ResponseEntity.status(403).body(fallback);
+        } catch (Exception e) {
+            Map<String, String> fallback = new HashMap<>();
+            fallback.put("description", "Planetary data service temporarily unavailable.");
+            fallback.put("status", "error");
+            return ResponseEntity.status(503).body(fallback);
+        }
     }
 }
