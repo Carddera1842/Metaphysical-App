@@ -1,38 +1,42 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Register() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(null);
+
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
 
     try {
-      const response = await fetch("http://localhost:8080/api/auth/register", {
+      const res = await fetch("http://localhost:8080/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password, displayName }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, displayName, password }),
       });
 
-      if (!response.ok) {
-        const errorMessage = await response.text(); // get backend message
-        throw new Error(errorMessage || "Registration failed");
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg);
       }
 
-      const data = await response.json();
-      console.log("Registration successful:", data);
-      alert("Registration successful! You can now log in.");
+      const data = await res.json();
+      localStorage.setItem("token", data.token);
+      navigate("/dashboard");
     } catch (err) {
-      console.error(err);
-      alert(`Registration error: ${err.message}`);
+      setError(err.message);
     }
   };
 
   return (
     <form onSubmit={handleSubmit}>
+      <h2>Register</h2>
+      {error && <p style={{ color: "red" }}>{error}</p>}
       <input
         type="text"
         placeholder="Display Name"
