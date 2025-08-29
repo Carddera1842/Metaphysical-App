@@ -1,49 +1,70 @@
 package com.metaphysical.metaphysical.controller;
 
-import com.metaphysical.metaphysical.dto.HoroscopeRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestTemplate;
-import java.util.HashMap;
-import java.util.Map;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+
+import java.io.*;
 
 @RestController
 @RequestMapping("/api/horoscope")
+@RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:5173") // allow your frontend
 public class HoroscopeController {
 
-    private final RestTemplate restTemplate;
     private final String apiKey = "dcK6WOXwUM4jxCEkdtZo175ImDtBjmQI631caiCH";
 
-    public HoroscopeController(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
-
     @PostMapping("/planets")
-    public ResponseEntity<?> getPlanetaryPositions(@RequestBody HoroscopeRequest request) {
+    public ResponseEntity<String> getPlanets(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody String payload) {
+
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("{\"error\":\"User not authenticated\"}");
+        }
+
         try {
-            String apiUrl = "https://json.freeastrologyapi.com/western/planets";
+            URL url = new URL("https://json.freeastrologyapi.com/western/planets");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("x-api-key", apiKey);
+            conn.setDoOutput(true);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("x-api-key", apiKey);  // ✅ MUST be this
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(payload.getBytes(StandardCharsets.UTF_8));
+            }
 
-            HttpEntity<HoroscopeRequest> entity = new HttpEntity<>(request, headers);
+            int status = conn.getResponseCode();
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(
+                    status >= 200 && status < 300 ? conn.getInputStream() : conn.getErrorStream()
+            ))) {
+                StringBuilder content = new StringBuilder();
+                String line;
+                while ((line = in.readLine()) != null) {
+                    content.append(line);
+                }
+                return ResponseEntity.status(status)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(content.toString());
+            } finally {
+                conn.disconnect();
+            }
 
-            ResponseEntity<String> response = restTemplate.exchange(
-                    apiUrl, HttpMethod.POST, entity, String.class);
-
-            return ResponseEntity.ok(response.getBody());
-        } catch (HttpClientErrorException.Forbidden e) {
-            Map<String, String> fallback = new HashMap<>();
-            fallback.put("description", "Planetary data service temporarily unavailable (403).");
-            fallback.put("status", "error");
-            return ResponseEntity.status(403).body(fallback);
-        } catch (Exception e) {
-            Map<String, String> fallback = new HashMap<>();
-            fallback.put("description", "Planetary data service temporarily unavailable.");
-            fallback.put("status", "error");
-            return ResponseEntity.status(503).body(fallback);
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("{\"error\":\"Failed to fetch horoscope\"}");
         }
     }
 }
