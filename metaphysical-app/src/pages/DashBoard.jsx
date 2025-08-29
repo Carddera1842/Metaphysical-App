@@ -1,53 +1,43 @@
 import { useEffect, useState } from "react";
 
-export default function Dashboard({ token }) {
+export default function Dashboard() {
   const [user, setUser] = useState(null);
-  const [planets, setPlanets] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Fetch user info
-    fetch("http://localhost:8080/api/auth/me", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then(res => res.json())
-      .then(data => setUser(data))
-      .catch(err => console.error(err));
+    const fetchUser = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setError("No token found, please login.");
+          return;
+        }
 
-    // Fetch horoscope/planets
-    fetch("http://localhost:8080/api/horoscope/planets", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then(res => res.json())
-      .then(data => {
-        setPlanets(data.output || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
-  }, [token]);
+        const res = await fetch("http://localhost:8080/api/me", {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
 
-  if (loading) return <p>Loading your horoscope...</p>;
+        if (!res.ok) {
+          throw new Error(`Failed to fetch user: ${res.status}`);
+        }
+
+        const data = await res.text();
+        setUser(data);
+      } catch (err) {
+        setError(err.message);
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   return (
-    <div style={{ padding: "2rem" }}>
-      <h1>Hello, {user?.displayName || "User"}!</h1>
-
-      <h2>Your Planet Positions</h2>
-      <ul>
-        {planets.map((p, idx) => (
-          <li key={idx}>
-            <strong>{p.planet.en}</strong>: {p.zodiac_sign.name.en}{" "}
-            ({p.fullDegree.toFixed(2)}°) {p.isRetro === "True" && "(Retrograde)"}
-          </li>
-        ))}
-      </ul>
+    <div>
+      <h1>Dashboard</h1>
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      {user ? <p>{user}</p> : <p>Loading...</p>}
     </div>
   );
 }

@@ -23,7 +23,7 @@ export default function Login({ setToken }) {
 
       const data = await response.json();
       console.log("Login successful:", data);
-      setToken(data.token); // store token in parent state (or localStorage)
+      setToken(data.token); 
       alert("Login successful!");
     } catch (err) {
       console.error(err);
